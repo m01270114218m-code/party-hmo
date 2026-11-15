@@ -4,152 +4,94 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 
-import com.tencent.cloud.tuikit.engine.common.TUICommonDefine;
-import com.tencent.cloud.tuikit.engine.room.TUIRoomDefine;
-import com.tencent.qcloud.tuicore.TUILogin;
-import com.tencent.qcloud.tuicore.interfaces.TUICallback;
-import com.trtc.tuikit.common.imageloader.ImageLoader;
-import com.trtc.tuikit.common.ui.ConfirmWithCheckboxDialog;
 import com.trtc.uikit.livekit.example.BaseActivity;
 import com.trtc.uikit.livekit.example.R;
-import com.trtc.uikit.livekit.example.service.ICallBack;
-import com.trtc.uikit.livekit.example.service.IMManager;
-import com.trtc.uikit.livekit.example.store.AppStore;
+import com.trtc.uikit.livekit.example.data.SupabaseApi;
+import com.trtc.uikit.livekit.example.view.login.AuthSessionStore;
 import com.trtc.uikit.livekit.example.view.login.LoginActivity;
-import com.trtc.uikit.livekit.livestream.VideoLiveKit;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MeActivity extends BaseActivity {
-    private ImageView            mImageLogout;
-    private ImageView            mImageBack;
-    private ImageView            mImageAvatar;
-    private TextView             mTextNickname;
-    private TextView             mTextMyFollowCount;
-    private TextView             mTextFollowMeCount;
-    private ChangeNickNamePicker mPicker;
+    private ImageView logoutView;
+    private ImageView backView;
+    private ImageView avatarView;
+    private TextView nicknameView;
+    private TextView followingCountView;
+    private TextView followersCountView;
+    private AuthSessionStore session;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.app_fragment_me);
-
-        bindViewId();
-        initView();
-        initDate();
+        session = new AuthSessionStore(this);
+        logoutView = findViewById(R.id.iv_logout);
+        backView = findViewById(R.id.iv_back);
+        avatarView = findViewById(R.id.iv_avatar);
+        nicknameView = findViewById(R.id.tv_nickname);
+        followingCountView = findViewById(R.id.tv_likes_count);
+        followersCountView = findViewById(R.id.tv_follows_count);
+        avatarView.setImageResource(R.drawable.app_avatar);
+        nicknameView.setText("Party HMO user");
+        followingCountView.setText("0");
+        followersCountView.setText("0");
+        backView.setOnClickListener(v -> finish());
+        logoutView.setOnClickListener(v -> confirmLogout());
+        loadProfile();
     }
 
-    protected void initView() {
-        initLogoutView();
-        initBackView();
-        initNickNameView();
-        initMyFollowCountView();
-        initFollowMeCountView();
-        initAvatarView();
-    }
-
-    private void initLogoutView() {
-        mImageLogout.setOnClickListener(v -> {
-            showLogoutDialog();
-        });
-    }
-
-    private void initBackView() {
-        mImageBack.setOnClickListener(v -> {
-            finish();
-        });
-    }
-
-    private void initDate() {
-        IMManager.getUserFollowInfo(AppStore.userId, new ICallBack() {
-            @Override
-            public void onSuccess() {
-                if (isDestroyed() || isFinishing()) {
-                    return;
+    private void loadProfile() {
+        if (!session.hasSession()) return;
+        new Thread(() -> {
+            try {
+                JSONObject result = SupabaseApi.request(
+                        "/rest/v1/profiles?select=display_name,avatar_url&id=eq."
+                                + SupabaseApi.encode(session.getUserId()) + "&limit=1",
+                        "GET", null, session.getAccessToken());
+                JSONArray rows = result.optJSONArray("items");
+                if (rows != null && rows.length() > 0) {
+                    JSONObject profile = rows.getJSONObject(0);
+                    String name = profile.optString("display_name", "Party HMO user");
+                    runOnUiThread(() -> nicknameView.setText(name));
                 }
-                mTextFollowMeCount.post(() -> {
-                    mTextFollowMeCount.setText(String.valueOf(AppStore.fansCount));
-                    mTextMyFollowCount.setText(String.valueOf(AppStore.followCount));
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        }).start();
+    }
+
+    private void confirmLogout() {
+        new AlertDialog.Builder(this)
+                .setTitle("تسجيل الخروج")
+                .setMessage("هل تريد تسجيل الخروج من حسابك؟")
+                .setNegativeButton("إلغاء", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("خروج", (dialog, which) -> logout())
+                .show();
+    }
+
+    private void logout() {
+        new Thread(() -> {
+            try {
+                if (session.hasSession()) {
+                    SupabaseApi.request("/auth/v1/logout", "POST", null, session.getAccessToken());
+                }
+            } catch (Exception ignored) {
+            } finally {
+                session.clear();
+                runOnUiThread(() -> {
+                    Intent intent = new Intent(this, LoginActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                    finish();
                 });
             }
-
-            @Override
-            public void onError(int code, String desc) {
-
-            }
-        });
+        }).start();
     }
-
-    private void initNickNameView() {
-        mTextNickname.setText(TUILogin.getNickName());
-        mTextNickname.setOnClickListener(view -> {
-            mPicker = new ChangeNickNamePicker(this, mTextNickname);
-            if (!mPicker.isShowing()) {
-                mPicker.show();
-            }
-        });
-    }
-
-    private void initAvatarView() {
-        ImageLoader.load(getApplicationContext(),
-                mImageAvatar,
-                TUILogin.getFaceUrl(),
-                com.trtc.uikit.livekit.R.drawable.livekit_ic_avatar);
-    }
-
-    private void initFollowMeCountView() {
-        mTextFollowMeCount.setText(String.valueOf(AppStore.fansCount));
-    }
-
-    private void initMyFollowCountView() {
-        mTextMyFollowCount.setText(String.valueOf(AppStore.followCount));
-    }
-
-    private void bindViewId() {
-        mImageLogout = findViewById(R.id.iv_logout);
-        mImageBack = findViewById(R.id.iv_back);
-        mTextNickname = findViewById(R.id.tv_nickname);
-        mTextMyFollowCount = findViewById(R.id.tv_likes_count);
-        mTextFollowMeCount = findViewById(R.id.tv_follows_count);
-        mImageAvatar = findViewById(R.id.iv_avatar);
-    }
-
-    private void showLogoutDialog() {
-        ConfirmWithCheckboxDialog dialog = new ConfirmWithCheckboxDialog(this);
-        dialog.setTitle(getString(R.string.app_tips_title));
-        dialog.setContent(getString(R.string.app_logout_tips));
-        dialog.setNegativeText(getString(R.string.app_cancel), negativeView -> dialog.dismiss());
-        dialog.setPositiveText(getString(R.string.app_logout), positiveView -> {
-            VideoLiveKit.createInstance(getApplicationContext()).stopLive(new TUIRoomDefine.ActionCallback() {
-                @Override
-                public void onSuccess() {
-                    TUILogin.logout(new TUICallback() {
-                        @Override
-                        public void onSuccess() {
-                        }
-
-                        @Override
-                        public void onError(int errorCode, String errorMessage) {
-                        }
-                    });
-                }
-
-                @Override
-                public void onError(TUICommonDefine.Error error, String s) {
-                }
-            });
-
-            Intent intent = new Intent(MeActivity.this, LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-            finish();
-        });
-        dialog.show();
-
-
-    }
-
-
 }
