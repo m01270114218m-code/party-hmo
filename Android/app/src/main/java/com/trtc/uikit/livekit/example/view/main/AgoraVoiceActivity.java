@@ -151,6 +151,7 @@ public class AgoraVoiceActivity extends BaseActivity {
                 int generatedUid = userId.hashCode() & 0x7fffffff;
                 final int uid = generatedUid == 0 ? 1 : generatedUid;
                 JSONObject tokenRequest = new JSONObject();
+                tokenRequest.put("appId", BuildConfig.AGORA_APP_ID);
                 tokenRequest.put("channel", channel);
                 tokenRequest.put("uid", uid);
                 JSONObject tokenResponse = SupabaseApi.request(
@@ -201,6 +202,7 @@ public class AgoraVoiceActivity extends BaseActivity {
         new Thread(() -> {
             try {
                 JSONObject body = new JSONObject();
+                body.put("appId", BuildConfig.AGORA_APP_ID);
                 body.put("channel", currentChannel);
                 body.put("uid", currentUid);
                 JSONObject result = SupabaseApi.request("/functions/v1/agora-token", "POST",
