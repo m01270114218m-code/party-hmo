@@ -30,7 +30,7 @@ import io.agora.rtc2.Constants;
 import io.agora.rtc2.IRtcEngineEventHandler;
 import io.agora.rtc2.RtcEngine;
 import io.agora.rtc2.RtcEngineConfig;
-import io.agora.rtc2.RtcStats;
+import io.agora.rtc2.IRtcEngineEventHandler.RtcStats;
 
 public class AgoraVoiceActivity extends BaseActivity {
     private static final String TAG = "AgoraVoiceActivity";
