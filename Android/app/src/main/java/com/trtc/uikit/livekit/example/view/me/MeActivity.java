@@ -2,6 +2,7 @@ package com.trtc.uikit.livekit.example.view.me;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,7 +20,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class MeActivity extends BaseActivity {
-    private ImageView logoutView;
+    private View logoutView;
     private ImageView backView;
     private ImageView avatarView;
     private TextView nicknameView;
