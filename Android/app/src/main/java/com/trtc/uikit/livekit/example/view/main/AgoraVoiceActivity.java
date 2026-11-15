@@ -80,6 +80,8 @@ public class AgoraVoiceActivity extends BaseActivity {
         setContentView(R.layout.app_activity_agora_voice);
         sessionStore = new AuthSessionStore(this);
         roomInput = findViewById(R.id.et_channel);
+        String requestedRoom = getIntent().getStringExtra("room_name");
+        if (requestedRoom != null && !requestedRoom.trim().isEmpty()) roomInput.setText(requestedRoom);
         statusView = findViewById(R.id.tv_status);
         joinButton = findViewById(R.id.btn_join);
 
