@@ -17,9 +17,14 @@ android {
         versionName "1.0"
         multiDexEnabled true
 
-        buildConfigField "String", "SUPABASE_URL", "\"\u0024{project.findProperty('SUPABASE_URL') ?: ''}\""
-        buildConfigField "String", "SUPABASE_PUBLISHABLE_KEY", "\"\u0024{project.findProperty('SUPABASE_PUBLISHABLE_KEY') ?: ''}\""
-        buildConfigField "String", "AGORA_APP_ID", "\"\u0024{project.findProperty('AGORA_APP_ID') ?: ''}\""
+        def buildConfigValue = { name ->
+            (project.findProperty(name) ?: "").toString()
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+        }
+        buildConfigField "String", "SUPABASE_URL", "\"${buildConfigValue('SUPABASE_URL')}\""
+        buildConfigField "String", "SUPABASE_PUBLISHABLE_KEY", "\"${buildConfigValue('SUPABASE_PUBLISHABLE_KEY')}\""
+        buildConfigField "String", "AGORA_APP_ID", "\"${buildConfigValue('AGORA_APP_ID')}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
