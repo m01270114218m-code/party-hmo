@@ -123,7 +123,13 @@ public class AgoraVoiceActivity extends BaseActivity {
         new Thread(() -> {
             try {
                 String access = sessionStore.getAccessToken();
-                String userId = sessionStore.getUserId();
+                // Resolve the authenticated user from the same JWT used by PostgREST.
+                // A stale cached user_id must never be used as the room owner.
+                JSONObject authUser = SupabaseApi.request("/auth/v1/user", "GET", null, access);
+                String userId = authUser.optString("id", "");
+                if (userId.isEmpty() || !userId.equals(sessionStore.getUserId())) {
+                    throw new IllegalStateException("جلسة الدخول غير متطابقة. سجّل الخروج ثم ادخل مرة أخرى.");
+                }
                 String query = "/rest/v1/rooms?select=id,title,agora_channel,owner_id&title=eq."
                         + SupabaseApi.encode(roomName) + "&status=eq.active&limit=1";
                 JSONObject response = SupabaseApi.request(query, "GET", null, access);
