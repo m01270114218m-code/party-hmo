@@ -150,5 +150,16 @@
                 android:src="@drawable/app_ic_enter_live" />
 
         </RelativeLayout>
+
+        <TextView
+            android:id="@+id/btn_profile"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/app_bg_main_kit_item"
+            android:gravity="center"
+            android:text="حسابي / تسجيل الخروج"
+            android:textColor="@color/app_color_black"
+            android:textSize="16sp" />
     </LinearLayout>
 </RelativeLayout>
