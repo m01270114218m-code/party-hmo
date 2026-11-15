@@ -21,6 +21,7 @@ import io.agora.rtc2.Constants;
 import io.agora.rtc2.IRtcEngineEventHandler;
 import io.agora.rtc2.RtcEngine;
 import io.agora.rtc2.RtcEngineConfig;
+import io.agora.rtc2.RtcStats;
 
 public class AgoraVoiceActivity extends BaseActivity {
     private static final int REQ_RECORD_AUDIO = 1001;
