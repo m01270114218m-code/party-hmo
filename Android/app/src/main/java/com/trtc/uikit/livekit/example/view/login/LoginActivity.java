@@ -73,7 +73,11 @@ public class LoginActivity extends BaseActivity {
                 sessionStore.save(userId, access, result.optString("refresh_token", ""),
                         result.optLong("expires_in", 3600));
                 AppStore.userId = userId;
-                syncProfile(userId, email, access);
+                try {
+                    syncProfile(userId, email, access);
+                } catch (Exception profileError) {
+                    Log.w(TAG, "Profile initialization will be retried later", profileError);
+                }
                 runOnUiThread(() -> {
                     setBusy(false);
                     openMain();
