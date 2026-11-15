@@ -7,6 +7,7 @@ import android.widget.TextView;
 
 import com.trtc.uikit.livekit.example.BaseActivity;
 import com.trtc.uikit.livekit.example.R;
+import com.trtc.uikit.livekit.example.view.me.MeActivity;
 
 public class MainActivity extends BaseActivity {
     @Override
@@ -19,5 +20,7 @@ public class MainActivity extends BaseActivity {
         findViewById(R.id.btn_multi_function).setVisibility(View.GONE);
         findViewById(R.id.voice_room).setOnClickListener(v ->
                 startActivity(new Intent(MainActivity.this, AgoraVoiceActivity.class)));
+        findViewById(R.id.btn_profile).setOnClickListener(v ->
+                startActivity(new Intent(MainActivity.this, MeActivity.class)));
     }
 }
