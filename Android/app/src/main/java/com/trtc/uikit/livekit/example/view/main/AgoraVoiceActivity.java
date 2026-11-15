@@ -148,8 +148,8 @@ public class AgoraVoiceActivity extends BaseActivity {
                     SupabaseApi.request("/rest/v1/rooms", "POST", create, access,
                             "return=minimal");
                 }
-                int uid = userId.hashCode() & 0x7fffffff;
-                if (uid == 0) uid = 1;
+                int generatedUid = userId.hashCode() & 0x7fffffff;
+                final int uid = generatedUid == 0 ? 1 : generatedUid;
                 JSONObject tokenRequest = new JSONObject();
                 tokenRequest.put("channel", channel);
                 tokenRequest.put("uid", uid);
