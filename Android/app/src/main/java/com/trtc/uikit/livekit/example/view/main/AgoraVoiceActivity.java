@@ -122,19 +122,23 @@ public class AgoraVoiceActivity extends BaseActivity {
             try {
                 String access = sessionStore.getAccessToken();
                 String userId = sessionStore.getUserId();
-                String query = "/rest/v1/rooms?select=id,title,agora_channel&title=eq."
+                String query = "/rest/v1/rooms?select=id,title,agora_channel,owner_id&title=eq."
                         + SupabaseApi.encode(roomName) + "&status=eq.active&limit=1";
                 JSONObject response = SupabaseApi.request(query, "GET", null, access);
                 JSONArray rows = response.optJSONArray("items");
                 String channel = null;
+                String roomId;
+                String roomOwner;
                 if (rows != null && rows.length() > 0) {
                     JSONObject room = rows.getJSONObject(0);
+                    roomId = room.getString("id");
+                    roomOwner = room.optString("owner_id", "");
                     channel = room.optString("agora_channel", "");
                     if (channel.isEmpty()) {
                         channel = UUID.randomUUID().toString().replace("-", "");
                         JSONObject update = new JSONObject();
                         update.put("agora_channel", channel);
-                        SupabaseApi.request("/rest/v1/rooms?id=eq." + room.getString("id"),
+                        SupabaseApi.request("/rest/v1/rooms?id=eq." + roomId,
                                 "PATCH", update, access, "return=minimal");
                     }
                 } else {
@@ -145,9 +149,20 @@ public class AgoraVoiceActivity extends BaseActivity {
                     create.put("agora_channel", channel);
                     create.put("room_type", "public");
                     create.put("status", "active");
-                    SupabaseApi.request("/rest/v1/rooms", "POST", create, access,
-                            "return=minimal");
+                    JSONObject created = SupabaseApi.request("/rest/v1/rooms", "POST", create, access,
+                            "return=representation");
+                    JSONArray createdRows = created.optJSONArray("items");
+                    if (createdRows == null || createdRows.length() == 0) throw new IllegalStateException("تعذر إنشاء الغرفة");
+                    JSONObject newRoom = createdRows.getJSONObject(0);
+                    roomId = newRoom.getString("id");
+                    roomOwner = userId;
                 }
+                JSONObject member = new JSONObject();
+                member.put("room_id", roomId);
+                member.put("user_id", userId);
+                member.put("role", userId.equals(roomOwner) ? "owner" : "member");
+                SupabaseApi.request("/rest/v1/room_members?on_conflict=room_id,user_id", "POST",
+                        member, access, "resolution=merge-duplicates,return=minimal");
                 int generatedUid = userId.hashCode() & 0x7fffffff;
                 final int uid = generatedUid == 0 ? 1 : generatedUid;
                 JSONObject tokenRequest = new JSONObject();
