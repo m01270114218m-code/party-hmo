@@ -4,108 +4,88 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.WindowManager;
 import android.widget.EditText;
 
-import com.tencent.imsdk.v2.V2TIMManager;
-import com.tencent.imsdk.v2.V2TIMUserFullInfo;
-import com.tencent.imsdk.v2.V2TIMValueCallback;
-import com.tencent.qcloud.tuicore.TUILogin;
-import com.tencent.qcloud.tuicore.interfaces.TUICallback;
-import com.tencent.qcloud.tuicore.util.SPUtils;
-import com.tencent.qcloud.tuicore.util.ToastUtil;
-import com.tencent.qcloud.tuikit.debug.GenerateTestUserSig;
 import com.trtc.uikit.livekit.example.BaseActivity;
 import com.trtc.uikit.livekit.example.R;
 import com.trtc.uikit.livekit.example.store.AppStore;
 import com.trtc.uikit.livekit.example.view.main.MainActivity;
+import com.trtc.uikit.livekit.example.BuildConfig;
 
-import java.util.ArrayList;
-import java.util.List;
+import org.json.JSONObject;
+import java.io.IOException;
+import java.util.UUID;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class LoginActivity extends BaseActivity {
     private static final String TAG = "LoginActivity";
-
-    private EditText mEditUserId;
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private final OkHttpClient httpClient = new OkHttpClient();
+    private EditText emailEdit;
+    private EditText passwordEdit;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.app_activity_login);
-        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
-
-        mEditUserId = findViewById(R.id.et_userId);
-        mEditUserId.setText(SPUtils.getInstance("livekit").getString("userId"));
-        findViewById(R.id.btn_login).setOnClickListener(v -> {
-            String userId = mEditUserId.getText().toString().trim();
-            SPUtils.getInstance("livekit").put("userId", userId);
-            login(userId);
-        });
+        emailEdit = findViewById(R.id.et_email);
+        passwordEdit = findViewById(R.id.et_password);
+        findViewById(R.id.btn_login).setOnClickListener(v -> authenticate(false));
+        findViewById(R.id.btn_register).setOnClickListener(v -> authenticate(true));
     }
 
-    private void login(String userId) {
-        if (TextUtils.isEmpty(userId)) {
-            ToastUtil.toastShortMessage(getString(R.string.app_user_id_is_empty));
+    private void authenticate(boolean register) {
+        String email = emailEdit.getText().toString().trim();
+        String password = passwordEdit.getText().toString();
+        if (TextUtils.isEmpty(email) || TextUtils.isEmpty(password)) {
+            emailEdit.setError("Email and password are required");
             return;
         }
-        TUILogin.login(this, GenerateTestUserSig.SDKAPPID, userId, GenerateTestUserSig.genTestUserSig(userId),
-                new TUICallback() {
-                    @Override
-                    public void onSuccess() {
-                        Log.i(TAG, "login success");
-                        AppStore.userId = userId;
-                        getUserInfo(userId);
+        if (TextUtils.isEmpty(BuildConfig.SUPABASE_URL) ||
+                TextUtils.isEmpty(BuildConfig.SUPABASE_PUBLISHABLE_KEY)) {
+            emailEdit.setError("Supabase configuration is missing");
+            return;
+        }
+        new Thread(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("email", email);
+                body.put("password", password);
+                String endpoint = BuildConfig.SUPABASE_URL + "/auth/v1/" +
+                        (register ? "signup" : "token?grant_type=password");
+                Request request = new Request.Builder()
+                        .url(endpoint)
+                        .addHeader("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY)
+                        .addHeader("Authorization", "Bearer " + BuildConfig.SUPABASE_PUBLISHABLE_KEY)
+                        .post(RequestBody.create(body.toString(), JSON))
+                        .build();
+                try (Response response = httpClient.newCall(request).execute()) {
+                    String responseText = response.body() != null ? response.body().string() : "";
+                    if (!response.isSuccessful()) {
+                        runOnUiThread(() -> passwordEdit.setError("Authentication failed"));
+                        Log.e(TAG, responseText);
+                        return;
                     }
-
-                    @Override
-                    public void onError(int errorCode, String errorMessage) {
-                        ToastUtil.toastShortMessage(getString(R.string.app_toast_login_fail));
-                        Log.e(TAG, "login fail，error code: " + errorCode + " message:" + errorMessage);
-                    }
-                });
-    }
-
-    private void getUserInfo(String userId) {
-        List<String> userList = new ArrayList<>();
-        userList.add(userId);
-
-        V2TIMManager v2TIMManager = V2TIMManager.getInstance();
-        v2TIMManager.getUsersInfo(userList, new V2TIMValueCallback<List<V2TIMUserFullInfo>>() {
-            @Override
-            public void onError(int errorCode, String errorMsg) {
-                Log.e(TAG, "getUserInfo failed, code:" + errorCode + " msg: " + errorMsg);
-            }
-
-            @Override
-            public void onSuccess(List<V2TIMUserFullInfo> userFullInfoList) {
-                if (userFullInfoList == null || userFullInfoList.isEmpty()) {
-                    Log.w(TAG, "getUserInfo result is empty");
-                    return;
+                    JSONObject result = new JSONObject(responseText);
+                    String userId = result.has("user") && !result.isNull("user")
+                            ? result.getJSONObject("user").optString("id", UUID.randomUUID().toString())
+                            : UUID.randomUUID().toString();
+                    AppStore.userId = userId;
+                    runOnUiThread(this::startMainActivity);
                 }
-                V2TIMUserFullInfo timUserFullInfo = userFullInfoList.get(0);
-                String userName = timUserFullInfo.getNickName();
-                String userAvatar = timUserFullInfo.getFaceUrl();
-                Log.d(TAG, "getUserInfo success: userName = " + userName + " , userAvatar = " + userAvatar);
-
-                if (TextUtils.isEmpty(userName) || TextUtils.isEmpty(userAvatar)) {
-                    startProfileActivity();
-                } else {
-                    AppStore.userAvatar = userAvatar;
-                    AppStore.userName = userName;
-                    startMainActivity();
-                }
-                finish();
+            } catch (Exception e) {
+                Log.e(TAG, "Supabase authentication failed", e);
+                runOnUiThread(() -> passwordEdit.setError("Network or authentication error"));
             }
-        });
-    }
-
-    private void startProfileActivity() {
-        Intent intent = new Intent(LoginActivity.this, ProfileActivity.class);
-        startActivity(intent);
+        }).start();
     }
 
     private void startMainActivity() {
-        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-        startActivity(intent);
+        startActivity(new Intent(LoginActivity.this, MainActivity.class));
+        finish();
     }
 }
