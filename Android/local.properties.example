@@ -1,0 +1,4 @@
+# Local Android configuration (DO NOT COMMIT real secrets here)
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+AGORA_APP_ID=YOUR_AGORA_APP_ID
