@@ -12,92 +12,58 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.trtc.uikit.livekit.example.R;
+import com.trtc.uikit.livekit.example.view.main.AgoraVoiceActivity;
 import com.trtc.uikit.livekit.example.view.main.model.MainItemData;
-import com.trtc.uikit.livekit.livestream.VideoLiveListActivity;
-import com.trtc.uikit.livekit.voiceroom.VoiceRoomListActivity;
 
 import java.util.List;
 
+/** The only live-room entry point in Party HMO is Agora voice. */
 public class MainAdapter extends RecyclerView.Adapter<MainAdapter.ItemViewHolder> {
+    private final Context context;
+    private final List<MainItemData> data;
 
-    private final Context            mContext;
-    private final List<MainItemData> mDataList;
-
-    public MainAdapter(Context context, List<MainItemData> itemDataList) {
-        this.mContext = context;
-        this.mDataList = itemDataList;
+    public MainAdapter(Context context, List<MainItemData> data) {
+        this.context = context;
+        this.data = data;
     }
 
     @NonNull
     @Override
-    public MainAdapter.ItemViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.app_adapter_main_item, parent, false);
-        return new ItemViewHolder(view, mContext);
+    public ItemViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.app_adapter_main_item, parent, false);
+        return new ItemViewHolder(view, context);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ItemViewHolder holder, int position) {
-        MainItemData item = mDataList.get(position);
-        holder.bind(item);
+        holder.bind(data.get(position));
     }
 
     @Override
-    public long getItemId(int position) {
-        return position;
-    }
+    public int getItemCount() { return data.size(); }
 
-    @Override
-    public int getItemCount() {
-        return mDataList.size();
-    }
+    static class ItemViewHolder extends RecyclerView.ViewHolder {
+        private final Context context;
+        private final ImageView icon;
+        private final TextView title;
+        private final TextView subtitle;
 
-
-    public static class ItemViewHolder extends RecyclerView.ViewHolder {
-
-        private final Context   mContext;
-        private final ImageView mImageIcon;
-        private final TextView  mTextTitle;
-        private final TextView  mTextSubTitle;
-
-        public ItemViewHolder(@NonNull View itemView, Context context) {
+        ItemViewHolder(@NonNull View itemView, Context context) {
             super(itemView);
-            mContext = context;
-            mImageIcon = itemView.findViewById(R.id.iv_icon);
-            mTextTitle = itemView.findViewById(R.id.tv_title);
-            mTextSubTitle = itemView.findViewById(R.id.tv_subtitle);
+            this.context = context;
+            icon = itemView.findViewById(R.id.iv_icon);
+            title = itemView.findViewById(R.id.tv_title);
+            subtitle = itemView.findViewById(R.id.tv_subtitle);
         }
 
-        public void bind(MainItemData mainItemData) {
-            if (mainItemData == null) {
-                return;
-            }
-            itemView.setOnClickListener(v -> {
-                switch (mainItemData.getType()) {
-                    case TYPE_VOICE_ROOM:
-                        startVoiceRoomActivity();
-                        break;
-                    case TYPE_VIDEO_LIVE:
-                    default:
-                        startVideoLiveActivity();
-                        break;
-                }
-            });
-            mTextTitle.setText(mainItemData.getTitle());
-            mImageIcon.setImageResource(mainItemData.getResId());
-            mTextSubTitle.setText(mainItemData.getSubTitle());
-        }
-
-        private void startVideoLiveActivity() {
-            Intent intent = new Intent(mContext, VideoLiveListActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            mContext.startActivity(intent);
-        }
-
-        private void startVoiceRoomActivity() {
-            Intent intent = new Intent(mContext, VoiceRoomListActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            mContext.startActivity(intent);
+        void bind(MainItemData item) {
+            title.setText(item.getTitle());
+            subtitle.setText(item.getSubTitle());
+            icon.setImageResource(item.getResId());
+            itemView.setOnClickListener(v ->
+                    context.startActivity(new Intent(context, AgoraVoiceActivity.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         }
     }
-
 }
