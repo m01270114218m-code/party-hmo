@@ -1,16 +1,12 @@
 package com.trtc.uikit.livekit.example.view.main;
 
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
 
-import com.trtc.tuikit.common.util.ActivityLauncher;
 import com.trtc.uikit.livekit.example.BaseActivity;
 import com.trtc.uikit.livekit.example.R;
-import com.trtc.uikit.livekit.example.store.AppStore;
-import com.trtc.uikit.livekit.example.view.me.MeActivity;
 
 public class MainActivity extends BaseActivity {
     @Override
