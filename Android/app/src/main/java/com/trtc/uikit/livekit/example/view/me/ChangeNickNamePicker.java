@@ -7,6 +7,7 @@ import android.text.InputFilter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 
@@ -22,7 +23,7 @@ import java.util.regex.Pattern;
 public class ChangeNickNamePicker extends Dialog {
     private final android.widget.TextView target;
     private EditText nameInput;
-    private Button saveButton;
+    private TextView saveButton;
 
     public ChangeNickNamePicker(@NonNull Context context, android.widget.TextView target) {
         super(context);
@@ -61,8 +62,10 @@ public class ChangeNickNamePicker extends Dialog {
                 SupabaseApi.request("/rest/v1/profiles?id=eq." + SupabaseApi.encode(session.getUserId()),
                         "PATCH", body, session.getAccessToken(), "return=minimal");
                 AppStore.userName = name;
-                target.post(() -> target.setText(name));
-                dismiss();
+                target.post(() -> {
+                    target.setText(name);
+                    dismiss();
+                });
             } catch (Exception e) {
                 target.post(() -> {
                     saveButton.setEnabled(true);
