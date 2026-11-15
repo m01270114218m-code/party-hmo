@@ -31,6 +31,7 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
       auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
     const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
     if (authError || !user) return json({ error: "Invalid or expired Supabase session" }, 401);
