@@ -1,108 +1,74 @@
 package com.trtc.uikit.livekit.example.view.me;
 
-
+import android.app.Dialog;
 import android.content.Context;
+import android.os.Bundle;
 import android.text.InputFilter;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
-import com.tencent.qcloud.tuicore.TUILogin;
-import com.trtc.tuikit.common.ui.PopupDialog;
-import com.trtc.uikit.livekit.example.R;
-import com.trtc.uikit.livekit.example.service.ICallBack;
-import com.trtc.uikit.livekit.example.service.IMManager;
+import com.trtc.uikit.livekit.example.data.SupabaseApi;
 import com.trtc.uikit.livekit.example.store.AppStore;
+import com.trtc.uikit.livekit.example.view.login.AuthSessionStore;
 
-public class ChangeNickNamePicker extends PopupDialog {
+import org.json.JSONObject;
 
-    private EditText     mEditInputName;
-    private TextView     mTextNickname;
-    private ImageView    mImageBack;
-    private ImageView    mImageClearContent;
-    private TextView     mTextSave;
-    private LinearLayout mLayoutBackground;
+import java.util.regex.Pattern;
 
-    public ChangeNickNamePicker(@NonNull Context context, TextView textNickname) {
+/** Supabase-backed nickname editor. */
+public class ChangeNickNamePicker extends Dialog {
+    private final android.widget.TextView target;
+    private EditText nameInput;
+    private Button saveButton;
+
+    public ChangeNickNamePicker(@NonNull Context context, android.widget.TextView target) {
         super(context);
-        mTextNickname = textNickname;
-        initView();
+        this.target = target;
     }
 
-    private void initView() {
-        View view = LayoutInflater.from(getContext()).inflate(R.layout.app_change_name, null);
-        mImageBack = view.findViewById(R.id.iv_back);
-        mImageClearContent = view.findViewById(R.id.iv_clear_content);
-        mTextSave = view.findViewById(R.id.tv_save);
-        mEditInputName = view.findViewById(R.id.et_input);
-        mLayoutBackground = view.findViewById(R.id.ll_root);
-
-        setView(view);
-        initEditInputName();
-        initBackView();
-        initClearView();
-        initSaveView();
-        initBlankBg();
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        setContentView(com.trtc.uikit.livekit.example.R.layout.app_change_name);
+        nameInput = findViewById(com.trtc.uikit.livekit.example.R.id.et_input);
+        saveButton = findViewById(com.trtc.uikit.livekit.example.R.id.tv_save);
+        nameInput.setText(target.getText());
+        nameInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(20)});
+        findViewById(com.trtc.uikit.livekit.example.R.id.iv_back).setOnClickListener(v -> dismiss());
+        findViewById(com.trtc.uikit.livekit.example.R.id.iv_clear_content).setOnClickListener(v -> nameInput.setText(""));
+        saveButton.setOnClickListener(v -> save());
     }
 
-    private void initBlankBg() {
-        mLayoutBackground.setOnClickListener(v -> {
-            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) {
-                imm.hideSoftInputFromWindow(mEditInputName.getWindowToken(), 0);
+    private void save() {
+        String name = nameInput.getText().toString().trim();
+        if (!Pattern.compile("^[a-zA-Z0-9_]{2,20}$").matcher(name).matches()) {
+            nameInput.setError("Use 2-20 letters, numbers or underscores");
+            return;
+        }
+        AuthSessionStore session = new AuthSessionStore(getContext());
+        if (!session.hasSession()) {
+            Toast.makeText(getContext(), "Please sign in again", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        saveButton.setEnabled(false);
+        new Thread(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("display_name", name);
+                SupabaseApi.request("/rest/v1/profiles?id=eq." + SupabaseApi.encode(session.getUserId()),
+                        "PATCH", body, session.getAccessToken(), "return=minimal");
+                AppStore.userName = name;
+                target.post(() -> target.setText(name));
+                dismiss();
+            } catch (Exception e) {
+                target.post(() -> {
+                    saveButton.setEnabled(true);
+                    Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_LONG).show();
+                });
             }
-        });
-    }
-
-    private void initEditInputName() {
-        mEditInputName.setText(mTextNickname.getText());
-        mEditInputName.setSelection(mEditInputName.getText().length());
-        InputFilter filter = (source, start, end, dest, dstart, dend) -> {
-            for (int i = start; i < end; i++) {
-                char c = source.charAt(i);
-                if (!Character.isLetterOrDigit(c) && !Character.toString(c).matches("\\p{IsHan}") && c != '_') {
-                    return "";
-                }
-            }
-            return null;
-        };
-        mEditInputName.setFilters(new InputFilter[]{filter, new InputFilter.LengthFilter(20)});
-    }
-
-    private void initBackView() {
-        mImageBack.setOnClickListener(v -> dismiss());
-    }
-
-    private void initClearView() {
-        mImageClearContent.setOnClickListener(v -> mEditInputName.setText(""));
-    }
-
-    private void initSaveView() {
-        mTextSave.setOnClickListener(v -> {
-            String name = mEditInputName.getText().toString();
-            if (name.isEmpty()) {
-                return;
-            }
-            IMManager.setSelfInfo(AppStore.userAvatar, name, new ICallBack() {
-                @Override
-                public void onSuccess() {
-                    mTextNickname.post(() -> {
-                        mTextNickname.setText(AppStore.userName);
-                    });
-                }
-
-                @Override
-                public void onError(int code, String desc) {
-
-                }
-            });
-            dismiss();
-        });
+        }).start();
     }
 }
