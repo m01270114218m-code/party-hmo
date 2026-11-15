@@ -80,7 +80,7 @@ public class MeActivity extends BaseActivity {
         new Thread(() -> {
             try {
                 if (session.hasSession()) {
-                    SupabaseApi.request("/auth/v1/logout", "POST", null, session.getAccessToken());
+                    SupabaseApi.request("/auth/v1/logout", "POST", new JSONObject(), session.getAccessToken());
                 }
             } catch (Exception ignored) {
             } finally {
