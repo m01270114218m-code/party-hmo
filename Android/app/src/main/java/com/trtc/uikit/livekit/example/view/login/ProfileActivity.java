@@ -10,31 +10,27 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import com.tencent.qcloud.tuicore.util.ToastUtil;
-import com.trtc.tuikit.common.imageloader.ImageLoader;
 import com.trtc.uikit.livekit.example.BaseActivity;
 import com.trtc.uikit.livekit.example.R;
-import com.trtc.uikit.livekit.example.service.ICallBack;
-import com.trtc.uikit.livekit.example.service.IMManager;
-import com.trtc.uikit.livekit.example.view.main.MainActivity;
+import com.trtc.uikit.livekit.example.data.SupabaseApi;
 import com.trtc.uikit.livekit.example.store.AppStore;
+import com.trtc.uikit.livekit.example.view.main.MainActivity;
+
+import org.json.JSONObject;
 
 import java.util.Random;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ProfileActivity extends BaseActivity {
-    private static final String TAG = "ProfileActivity";
+    private ImageView avatarView;
+    private EditText nameEdit;
+    private Button saveButton;
+    private TextView tipsView;
+    private String avatarUrl;
 
-    private ImageView mImageAvatar;
-    private EditText  mEditUserName;
-    private Button    mButtonRegister;
-    private TextView  mTextInputTips;
-
-    private String mAvatarUrl;
-
-    private static final String[] USER_AVATAR_ARRAY = {
+    private static final String[] AVATARS = {
             "https://liteav.sdk.qcloud.com/app/res/picture/voiceroom/avatar/user_avatar1.png",
             "https://liteav.sdk.qcloud.com/app/res/picture/voiceroom/avatar/user_avatar2.png",
             "https://liteav.sdk.qcloud.com/app/res/picture/voiceroom/avatar/user_avatar3.png",
@@ -42,112 +38,66 @@ public class ProfileActivity extends BaseActivity {
             "https://liteav.sdk.qcloud.com/app/res/picture/voiceroom/avatar/user_avatar5.png"
     };
 
-    private static final int[] CUSTOM_NAME_ARRAY = {
-            R.string.app_custom_name_1,
-            R.string.app_custom_name_2,
-            R.string.app_custom_name_3,
-            R.string.app_custom_name_4,
-            R.string.app_custom_name_5,
-    };
-
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.app_activity_login_profile);
-        initAvatarImageView();
-        initUserEditText();
-        initRegisterButton();
-    }
+        avatarView = findViewById(R.id.iv_user_avatar);
+        nameEdit = findViewById(R.id.et_user_name);
+        tipsView = findViewById(R.id.tv_tips_user_name);
+        saveButton = findViewById(R.id.tv_register);
 
-    private void initAvatarImageView() {
-        mImageAvatar = findViewById(R.id.iv_user_avatar);
-        int index = new Random().nextInt(USER_AVATAR_ARRAY.length);
-        mAvatarUrl = USER_AVATAR_ARRAY[index];
-        ImageLoader.load(this, mImageAvatar, mAvatarUrl, R.drawable.app_avatar);
-    }
-
-    private void initUserEditText() {
-        mEditUserName = findViewById(R.id.et_user_name);
-        mTextInputTips = findViewById(R.id.tv_tips_user_name);
-
-        int index = new Random().nextInt(CUSTOM_NAME_ARRAY.length);
-        String userName = getString(CUSTOM_NAME_ARRAY[index]);
-
-        mEditUserName.setText(userName);
-        mEditUserName.setSelection(userName.length());
-        mEditUserName.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
-                InputFilter filter = (source, start1, end, dest, dstart, dend) -> {
-                    for (int i = start1; i < end; i++) {
-                        char c = source.charAt(i);
-                        if (!Character.isLetterOrDigit(c) && !Character.toString(c)
-                                .matches("\\p{IsHan}") && c != '_') {
-                            return "";
-                        }
-                    }
-                    return null;
-                };
-                mEditUserName.setFilters(new InputFilter[]{filter, new InputFilter.LengthFilter(20)});
+        avatarUrl = AVATARS[new Random().nextInt(AVATARS.length)];
+        avatarView.setImageResource(R.drawable.app_avatar);
+        String suggested = "User" + (1000 + new Random().nextInt(9000));
+        nameEdit.setText(suggested);
+        nameEdit.setSelection(suggested.length());
+        nameEdit.setFilters(new InputFilter[]{new InputFilter.LengthFilter(20)});
+        nameEdit.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                boolean valid = Pattern.compile("^[a-zA-Z0-9_]{2,20}$").matcher(s).matches();
+                tipsView.setTextColor(getResources().getColor(valid
+                        ? R.color.app_text_color_hint : R.color.app_color_input_no_match));
+                saveButton.setEnabled(valid);
             }
-
-            @Override
-            public void onTextChanged(CharSequence text, int start, int before, int count) {
-                if (isUserNameValid(text)) {
-                    mTextInputTips.setTextColor(getResources().getColor(R.color.app_text_color_hint));
-                } else {
-                    mTextInputTips.setTextColor(getResources().getColor(R.color.app_color_input_no_match));
-                }
-                mButtonRegister.setEnabled(text.length() != 0);
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-            }
+            @Override public void afterTextChanged(Editable s) {}
         });
+        saveButton.setOnClickListener(v -> saveProfile());
     }
 
-    private void initRegisterButton() {
-        mButtonRegister = findViewById(R.id.tv_register);
-        mButtonRegister.setOnClickListener(v -> setSelfInfo());
-
-    }
-
-    private void setSelfInfo() {
-        String userName = mEditUserName.getText().toString().trim();
-        if (TextUtils.isEmpty(userName)) {
-            ToastUtil.toastLongMessage(getString(R.string.app_hint_user_name));
+    private void saveProfile() {
+        String displayName = nameEdit.getText().toString().trim();
+        if (TextUtils.isEmpty(displayName) || !Pattern.compile("^[a-zA-Z0-9_]{2,20}$").matcher(displayName).matches()) {
+            nameEdit.setError("Use 2-20 letters, numbers or underscores");
             return;
         }
-        IMManager.setSelfInfo(mAvatarUrl, userName, new ICallBack() {
-            @Override
-            public void onSuccess() {
-                ToastUtil.toastLongMessage(getString(R.string.app_toast_register_success_and_logging_in));
-                AppStore.userName = userName;
-                AppStore.userAvatar = mAvatarUrl;
-                startMainActivity();
-                finish();
+        AuthSessionStore session = new AuthSessionStore(this);
+        if (!session.hasSession()) {
+            Toast.makeText(this, "Please sign in again", Toast.LENGTH_LONG).show();
+            return;
+        }
+        saveButton.setEnabled(false);
+        new Thread(() -> {
+            try {
+                JSONObject update = new JSONObject();
+                update.put("display_name", displayName);
+                update.put("avatar_url", avatarUrl);
+                SupabaseApi.request("/rest/v1/profiles?id=eq." + SupabaseApi.encode(session.getUserId()),
+                        "PATCH", update, session.getAccessToken(), "return=minimal");
+                AppStore.userName = displayName;
+                AppStore.userAvatar = avatarUrl;
+                runOnUiThread(() -> {
+                    saveButton.setEnabled(true);
+                    startActivity(new Intent(this, MainActivity.class));
+                    finish();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    saveButton.setEnabled(true);
+                    Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+                });
             }
-
-            @Override
-            public void onError(int code, String message) {
-                ToastUtil.toastLongMessage(getString(R.string.app_toast_failed_to_set, message));
-                startMainActivity();
-                finish();
-            }
-        });
-    }
-
-    private boolean isUserNameValid(CharSequence text) {
-        String editable = text.toString();
-        Pattern pattern = Pattern.compile("^[a-z0-9A-Z\\u4e00-\\u9fa5\\_]{2,20}$");
-        Matcher matcher = pattern.matcher(editable);
-        return matcher.matches();
-    }
-
-    private void startMainActivity() {
-        Intent intent = new Intent(ProfileActivity.this, MainActivity.class);
-        startActivity(intent);
+        }).start();
     }
 }
