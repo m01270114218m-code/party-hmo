@@ -45,6 +45,7 @@ public class MeActivity extends BaseActivity {
         followersCountView.setText("0");
         backView.setOnClickListener(v -> finish());
         logoutView.setOnClickListener(v -> confirmLogout());
+        nicknameView.setOnClickListener(v -> new ChangeNickNamePicker(this, nicknameView).show());
         loadProfile();
     }
 
@@ -60,7 +61,20 @@ public class MeActivity extends BaseActivity {
                 if (rows != null && rows.length() > 0) {
                     JSONObject profile = rows.getJSONObject(0);
                     String name = profile.optString("display_name", "Party HMO user");
-                    runOnUiThread(() -> nicknameView.setText(name));
+                    String userId = session.getUserId();
+                    JSONArray followers = SupabaseApi.request(
+                            "/rest/v1/follows?select=follower_id&following_id=eq." + SupabaseApi.encode(userId),
+                            "GET", null, session.getAccessToken()).optJSONArray("items");
+                    JSONArray following = SupabaseApi.request(
+                            "/rest/v1/follows?select=following_id&follower_id=eq." + SupabaseApi.encode(userId),
+                            "GET", null, session.getAccessToken()).optJSONArray("items");
+                    int followersCount = followers == null ? 0 : followers.length();
+                    int followingCount = following == null ? 0 : following.length();
+                    runOnUiThread(() -> {
+                        nicknameView.setText(name);
+                        followersCountView.setText(String.valueOf(followersCount));
+                        followingCountView.setText(String.valueOf(followingCount));
+                    });
                 }
             } catch (Exception e) {
                 runOnUiThread(() -> Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show());
