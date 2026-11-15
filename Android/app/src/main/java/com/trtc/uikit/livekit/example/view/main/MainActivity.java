@@ -9,7 +9,7 @@ import com.trtc.uikit.livekit.example.BaseActivity;
 import com.trtc.uikit.livekit.example.R;
 import com.trtc.uikit.livekit.example.store.AppStore;
 import com.trtc.uikit.livekit.livestream.VideoLiveListActivity;
-import com.trtc.uikit.livekit.voiceroom.VoiceRoomListActivity;
+
 
 public class MainActivity extends BaseActivity {
 
@@ -41,7 +41,7 @@ public class MainActivity extends BaseActivity {
 
     private void initVoiceRoomView() {
         findViewById(R.id.voice_room).setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, VoiceRoomListActivity.class);
+            Intent intent = new Intent(MainActivity.this, AgoraVoiceActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
         });
