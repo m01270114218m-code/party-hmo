@@ -7,14 +7,15 @@ import android.util.Log;
 import android.widget.EditText;
 
 import com.trtc.uikit.livekit.example.BaseActivity;
+import com.trtc.uikit.livekit.example.BuildConfig;
 import com.trtc.uikit.livekit.example.R;
 import com.trtc.uikit.livekit.example.store.AppStore;
 import com.trtc.uikit.livekit.example.view.main.MainActivity;
-import com.trtc.uikit.livekit.example.BuildConfig;
 
 import org.json.JSONObject;
-import java.io.IOException;
+
 import java.util.UUID;
+
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -27,10 +28,18 @@ public class LoginActivity extends BaseActivity {
     private final OkHttpClient httpClient = new OkHttpClient();
     private EditText emailEdit;
     private EditText passwordEdit;
+    private AuthSessionStore sessionStore;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        sessionStore = new AuthSessionStore(this);
+        if (sessionStore.hasSession()) {
+            AppStore.userId = sessionStore.getUserId();
+            startMainActivity();
+            return;
+        }
+
         setContentView(R.layout.app_activity_login);
         emailEdit = findViewById(R.id.et_email);
         passwordEdit = findViewById(R.id.et_password);
@@ -45,24 +54,31 @@ public class LoginActivity extends BaseActivity {
             emailEdit.setError("Email and password are required");
             return;
         }
-        if (TextUtils.isEmpty(BuildConfig.SUPABASE_URL) ||
-                TextUtils.isEmpty(BuildConfig.SUPABASE_PUBLISHABLE_KEY)) {
+        if (password.length() < 6) {
+            passwordEdit.setError("Password must be at least 6 characters");
+            return;
+        }
+        if (TextUtils.isEmpty(BuildConfig.SUPABASE_URL)
+                || TextUtils.isEmpty(BuildConfig.SUPABASE_PUBLISHABLE_KEY)) {
             emailEdit.setError("Supabase configuration is missing");
             return;
         }
+
         new Thread(() -> {
             try {
                 JSONObject body = new JSONObject();
                 body.put("email", email);
                 body.put("password", password);
-                String endpoint = BuildConfig.SUPABASE_URL + "/auth/v1/" +
-                        (register ? "signup" : "token?grant_type=password");
+                String endpoint = BuildConfig.SUPABASE_URL + "/auth/v1/"
+                        + (register ? "signup" : "token?grant_type=password");
+
                 Request request = new Request.Builder()
                         .url(endpoint)
                         .addHeader("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY)
                         .addHeader("Authorization", "Bearer " + BuildConfig.SUPABASE_PUBLISHABLE_KEY)
                         .post(RequestBody.create(body.toString(), JSON))
                         .build();
+
                 try (Response response = httpClient.newCall(request).execute()) {
                     String responseText = response.body() != null ? response.body().string() : "";
                     if (!response.isSuccessful()) {
@@ -70,12 +86,32 @@ public class LoginActivity extends BaseActivity {
                         Log.e(TAG, responseText);
                         return;
                     }
+
                     JSONObject result = new JSONObject(responseText);
-                    String userId = result.has("user") && !result.isNull("user")
-                            ? result.getJSONObject("user").optString("id", UUID.randomUUID().toString())
-                            : UUID.randomUUID().toString();
+                    JSONObject user = result.optJSONObject("user");
+                    if (user == null) {
+                        runOnUiThread(() -> passwordEdit.setError(
+                                register ? "Check your email to confirm the account" : "Authentication failed"));
+                        return;
+                    }
+
+                    String userId = user.optString("id", UUID.randomUUID().toString());
+                    String accessToken = result.optString("access_token", "");
+                    String refreshToken = result.optString("refresh_token", "");
+
                     AppStore.userId = userId;
-                    runOnUiThread(this::startMainActivity);
+                    // When email confirmation is enabled Supabase may not return a session yet.
+                    if (!TextUtils.isEmpty(accessToken)) {
+                        sessionStore.save(userId, accessToken, refreshToken);
+                    }
+
+                    runOnUiThread(() -> {
+                        if (register && TextUtils.isEmpty(accessToken)) {
+                            passwordEdit.setError("Account created. Confirm your email, then sign in.");
+                        } else {
+                            startMainActivity();
+                        }
+                    });
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Supabase authentication failed", e);
