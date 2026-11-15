@@ -55,12 +55,16 @@ public final class SupabaseApi {
                 throw new IOException(message.isEmpty() ? "Supabase request failed (" + response.code() + ")" : message);
             }
             if (text.isEmpty()) return new JSONObject();
-            if (text.startsWith("[")) {
-                JSONObject result = new JSONObject();
-                result.put("items", new JSONArray(text));
-                return result;
+            try {
+                if (text.startsWith("[")) {
+                    JSONObject result = new JSONObject();
+                    result.put("items", new JSONArray(text));
+                    return result;
+                }
+                return new JSONObject(text);
+            } catch (org.json.JSONException e) {
+                throw new IOException("Invalid JSON response from Supabase", e);
             }
-            return new JSONObject(text);
         }
     }
 
